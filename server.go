@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -24,6 +25,7 @@ var (
 )
 
 func hello(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
 	return c.String(http.StatusOK, "Hello, World!\n")
 }
 
@@ -37,6 +39,8 @@ func getfile(c echo.Context) error {
 		index.Unlock()
 
 		if fl, ok := sha1.Search(sha1sum); ok {
+			log.Println(fl[0].Path)
+			c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
 			return c.File(fl[0].Path)
 		}
 	}
@@ -46,7 +50,7 @@ func getfile(c echo.Context) error {
 func regfile(c echo.Context) (err error) {
 	r := new(RegFile)
 	if err = c.Bind(r); err != nil {
-		return
+		return c.NoContent(http.StatusBadRequest)
 	}
 	if r.SHA1 != "" && r.Name != "" {
 		index.Lock()
@@ -57,10 +61,11 @@ func regfile(c echo.Context) (err error) {
 			FileMap.Store(key, time.Now().Unix())
 			res := new(RegFileResp)
 			res.URL = "http://files.kabbalahmedia.info/get/" + key
+			c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
 			return c.JSON(http.StatusOK, res)
 		}
 	}
-	return c.JSON(http.StatusNoContent, "")
+	return c.NoContent(http.StatusNoContent)
 }
 
 func server(listen string) {
