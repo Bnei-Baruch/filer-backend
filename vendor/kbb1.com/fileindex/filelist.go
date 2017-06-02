@@ -30,7 +30,8 @@ func Load(r *bufio.Reader, filter FilterFunc) (FileList, error) {
 		if len(line) > 0 && line[0] != '#' {
 			err := json.Unmarshal(line, &data)
 			if err != nil {
-				return FileList{}, err
+				//return FileList{}, err
+				continue
 			}
 			if len(data) != 4 {
 				return FileList{}, errors.New("Wrong line:" + string(line))
