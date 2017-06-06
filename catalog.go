@@ -47,10 +47,16 @@ func filter(fr fileindex.FileRec) bool {
 // import an index from path using filter
 func load(path string) fileindex.FileList {
 	f, err := os.Open(path)
-	check(err)
+	if err != nil {
+		log.Println(err)
+		return fileindex.FileList{}
+	}
+	defer f.Close()
+
 	fl, err := fileindex.Load(bufio.NewReader(f), filter)
-	check(err)
-	f.Close()
+	if err != nil {
+		log.Println(err)
+	}
 	return fl
 }
 
@@ -67,11 +73,11 @@ func (il IndexList) FindPath(path string) *IndexFile {
 
 // Type: Index
 
-func NewIndex(path string, pattern string) Index {
-	return Index{List: make(IndexList, 0), SHA1: fileindex.NewFastSearch(), Path: path, Pattern: pattern}
+func NewIndex(path string, pattern string) *IndexMain {
+	return &IndexMain{List: make(IndexList, 0), FS: fileindex.NewFastSearch(), Path: path, Pattern: pattern}
 }
 
-func (idx *Index) Load() {
+func (idx *IndexMain) Load() {
 	indexes, err := GetIndexList(idx.Path, idx.Pattern)
 	if err != nil {
 		log.Println(err)
@@ -79,22 +85,22 @@ func (idx *Index) Load() {
 	}
 
 	list := make(IndexList, 0, 10)
-	sha1 := fileindex.NewFastSearch()
+	fs := fileindex.NewFastSearch()
 
 	for _, f := range indexes {
 		fullPath := idx.Path + "/" + f.Name()
 		fl := load(fullPath)
 		list = append(list, IndexFile{Path: fullPath, Mtime: f.ModTime().Unix(), Files: fl})
-		sha1.AddList(fl)
+		fs.AddList(fl)
 	}
 
 	idx.Lock()
 	idx.List = list
-	idx.SHA1 = sha1
+	idx.FS = fs
 	idx.Unlock()
 }
 
-func (idx *Index) IsModified() bool {
+func (idx *IndexMain) IsModified() bool {
 	indexes, err := GetIndexList(idx.Path, idx.Pattern)
 	if err != nil {
 		log.Println(err)

@@ -22,22 +22,31 @@ type (
 
 	IndexList []IndexFile
 
-	Index struct {
+	IndexMain struct {
 		sync.Mutex
 		List    IndexList
-		SHA1    fileindex.FastSearch
+		FS      fileindex.FastSearch
 		Path    string
 		Pattern string
+	}
+
+	ServerConf struct {
+		Listen  string
+		BaseURL string
+		Index   *IndexMain
+		Update  chan string
+	}
+
+	UpdateConf struct {
+		Index  *IndexMain
+		Reload time.Duration
+		Update chan string
 	}
 )
 
 const (
 	localConf  = ".config/filer_storage.conf"
 	globalConf = "/etc/filer_storage.conf"
-)
-
-var (
-	index Index
 )
 
 func signalHandler() chan os.Signal {
@@ -62,35 +71,21 @@ func configLoad() *toml.Tree {
 	return config
 }
 
-func check(err error) {
-	if err != nil {
-		log.Fatalln(err)
-	}
-}
-
 func main() {
 	signalChan := signalHandler()
 
 	config := configLoad()
+	baseurl := config.Get("server.baseurl").(string)
 	listen := config.Get("server.listen").(string)
 	reload := config.GetDefault("server.reload", time.Duration(10)).(time.Duration) * time.Second
 	path := config.Get("index.dir").(string)
 	pattern := config.Get("index.files").(string)
+	update := make(chan string, 100)
 
-	index = NewIndex(path, pattern)
+	index := NewIndex(path, pattern)
 	index.Load()
 
-	go server(listen)
-
-	go func() {
-		c := time.Tick(reload)
-		for _ = range c {
-			if index.IsModified() {
-				log.Println("Reload indexes")
-				index.Load()
-			}
-		}
-	}()
-
+	go webServer(ServerConf{Listen: listen, BaseURL: baseurl, Index: index, Update: update})
+	go updateServer(UpdateConf{Index: index, Reload: reload, Update: update})
 	_ = <-signalChan
 }

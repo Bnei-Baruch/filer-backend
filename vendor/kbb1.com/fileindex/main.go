@@ -18,7 +18,8 @@ type (
 	FilterFunc func(fr FileRec) bool
 
 	FastSearch struct {
-		ll map[string]FileList
+		sha1map map[string]FileList
+		pathmap map[string]FileRec
 	}
 )
 
