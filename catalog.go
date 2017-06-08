@@ -84,13 +84,25 @@ func (idx *IndexMain) Load() {
 		return
 	}
 
+	idx.Lock()
+	curlist := idx.List
+	idx.Unlock()
+
 	list := make(IndexList, 0, 10)
 	fs := fileindex.NewFastSearch()
-
 	for _, f := range indexes {
+		var fl fileindex.FileList
 		fullPath := idx.Path + "/" + f.Name()
-		fl := load(fullPath)
-		list = append(list, IndexFile{Path: fullPath, Mtime: f.ModTime().Unix(), Files: fl})
+		mtime := f.ModTime().Unix()
+
+		curidx := curlist.FindPath(fullPath)
+		if curidx == nil || curidx.Mtime != mtime {
+			fl = load(fullPath)
+			log.Printf("Loaded %d records from %s\n", len(fl), fullPath)
+		} else {
+			fl = curidx.Files
+		}
+		list = append(list, IndexFile{Path: fullPath, Mtime: mtime, Files: fl})
 		fs.AddList(fl)
 	}
 
