@@ -27,6 +27,13 @@ type (
 type (
 	FileList []os.FileInfo
 
+	Directory struct {
+		Path string
+		List FileList
+	}
+
+	FileTree []Directory
+
 	FilterFunc func(fi os.FileInfo) bool
 
 	FileFilter interface {

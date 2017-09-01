@@ -55,7 +55,7 @@ func SHA1_Copy(src, dst string) ([]byte, int64, error) {
 }
 
 // Calculate SHA1 of a file
-func SHA1_File(path string) ([]byte, int64, error) {
+func SHA1_File(path string) ([]byte, int64, os.FileInfo, error) {
 	f, err := os.Open(path)
 	if err == nil {
 		defer f.Close()
@@ -64,10 +64,11 @@ func SHA1_File(path string) ([]byte, int64, error) {
 		var n int64
 		n, err = io.CopyBuffer(hasher, f, buf)
 		if err == nil {
-			return hasher.Sum(nil), n, nil
+			stat, _ := f.Stat()
+			return hasher.Sum(nil), n, stat, nil
 		}
 	}
-	return nil, 0, err
+	return nil, 0, nil, err
 }
 
 // SHA1

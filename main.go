@@ -25,17 +25,18 @@ type (
 
 	IndexMain struct {
 		sync.Mutex
-		List    IndexList
-		FS      fileindex.FastSearch
-		Path    string
-		Pattern string
+		List IndexList
+		fs   *fileindex.FastSearch
+		Path string
 	}
 
 	ServerConf struct {
-		Listen  string
-		BaseURL string
-		Index   *IndexMain
-		Update  chan string
+		BasePathArchive string
+		BaseURL         string
+		Listen          string
+
+		Index  *IndexMain
+		Update chan string
 	}
 
 	UpdateConf struct {
@@ -54,7 +55,9 @@ func configLoad() *toml.Tree {
 	home := os.Getenv("HOME")
 	config, err := toml.LoadFile(home + "/" + localConf)
 	if err != nil {
-		config, err = toml.LoadFile(globalConf)
+		if err == os.ErrNotExist {
+			config, err = toml.LoadFile(globalConf)
+		}
 		if err != nil {
 			log.Fatalln("Error: ", err)
 		}
@@ -96,18 +99,20 @@ func main() {
 	signalChan := signalHandler()
 
 	config := configLoad()
+	basepathArchive := config.Get("server.basepath.Archive").(string)
 	baseurl := config.Get("server.baseurl").(string)
 	listen := config.Get("server.listen").(string)
 	reload := config.GetDefault("server.reload", time.Duration(10)).(time.Duration) * time.Second
 	path := config.Get("index.dir").(string)
-	pattern := config.Get("index.files").(string)
 	update := make(chan string, 100)
 
-	index := NewIndex(path, pattern)
+	InitStorages()
+	index := NewIndex(path)
 	index.Load()
 
-	go webServer(ServerConf{Listen: listen, BaseURL: baseurl, Index: index, Update: update})
+	go webServer(ServerConf{Listen: listen, BasePathArchive: basepathArchive, BaseURL: baseurl, Index: index, Update: update})
 	go updateServer(UpdateConf{Index: index, Reload: reload, Update: update})
 	go stoponupdate(signalChan)
+
 	_ = <-signalChan
 }

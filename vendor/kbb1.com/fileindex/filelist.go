@@ -6,49 +6,96 @@ import (
 	"errors"
 	"io"
 	"sort"
+
+	"golang.org/x/sync/syncmap"
 )
 
-const newListCapacity = 10000
+const newListCapacity = 1000
 
 // Imports records from r. The input format is
 //   ["Path", "Sha1", Size, Mtime]
 // It returns error and empty FileList:
 //   - if r contains a long line
 //   - if r contains a wrong data line
-// Records can be filtered with filter.The nil filter does nothing.
-func Load(r *bufio.Reader, filter FilterFunc) (FileList, error) {
+// Records can be filtered with filter. The nil filter does nothing.
+func load(r *bufio.Reader, filter FilterFunc, add AddFunc) error {
 	var data []interface{}
-	fl := make(FileList, 0, newListCapacity)
 	for {
 		line, isPrefix, err := r.ReadLine()
-		if err != nil && err != io.EOF {
-			return FileList{}, err
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
 		}
 		if isPrefix {
-			return FileList{}, ErrLongLine
+			return ErrLongLine
 		}
 		if len(line) > 0 && line[0] != '#' {
 			err := json.Unmarshal(line, &data)
 			if err != nil {
-				return FileList{}, err
+				return err
 			}
 			if len(data) != 4 {
-				return FileList{}, errors.New("Wrong line:" + string(line))
+				return errors.New("Wrong line:" + string(line))
 			}
-			var fr FileRec
+			fr := new(FileRec)
 			fr.Path = data[0].(string)
 			fr.Sha1 = data[1].(string)
 			fr.Size = int64(data[2].(float64))
 			fr.Mtime = int64(data[3].(float64))
 			if filter == nil || filter(fr) {
-				fl = append(fl, fr)
+				add(fr)
 			}
 		}
-		if err == io.EOF {
-			break
+	}
+	return nil
+}
+
+func Load(r *bufio.Reader, filter FilterFunc) (FileList, error) {
+	fl := make(FileList, 0, newListCapacity)
+	err := load(r, filter, func(fr *FileRec) {
+		fl = append(fl, fr)
+	})
+	if err != nil {
+		fl = make(FileList, 0)
+	}
+	return fl, err
+}
+
+func LoadMap(r *bufio.Reader, filter FilterFunc) (FileMap, error) {
+	fl := make(FileMap)
+	err := load(r, filter, func(fr *FileRec) {
+		fl[fr.Path] = fr
+	})
+	if err != nil {
+		fl = make(FileMap)
+	}
+	return fl, err
+}
+
+func LoadSyncMap(r *bufio.Reader, filter FilterFunc) (syncmap.Map, error) {
+	var fl syncmap.Map
+	err := load(r, filter, func(fr *FileRec) {
+		fl.Store(fr.Path, fr)
+	})
+	if err != nil {
+		fl = syncmap.Map{}
+	}
+	return fl, err
+}
+
+// Compare that two FileLists are equal
+func (fl FileList) Equal(ol FileList) bool {
+	if len(fl) != len(ol) {
+		return false
+	}
+	for i, fr := range fl {
+		if !fr.Equal(ol[i]) {
+			return false
 		}
 	}
-	return fl, nil
+	return true
 }
 
 // Filter records and create a new FileList
@@ -123,17 +170,4 @@ func (fl FileList) SplitSorted(filter FilterFunc) (FileList, FileList) {
 		}
 	}
 	return fl, FileList{}
-}
-
-// Compare that two FileLists are equal
-func (fl FileList) Equal(ol FileList) bool {
-	if len(fl) != len(ol) {
-		return false
-	}
-	for i, fr := range fl {
-		if !fr.Equal(ol[i]) {
-			return false
-		}
-	}
-	return true
 }

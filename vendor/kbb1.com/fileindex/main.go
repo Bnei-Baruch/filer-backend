@@ -1,30 +1,45 @@
 package fileindex
 
-import "errors"
+import (
+	"errors"
+)
 
 type (
 	FileRec struct {
-		Path  string
-		Sha1  string
-		Size  int64
-		Mtime int64
+		Path   string
+		Sha1   string
+		Size   int64
+		Mtime  int64
+		Device *Storage
 	}
 
-	FileList []FileRec
-	ByPath   []FileRec
-	BySize   []FileRec
-	ByTime   []FileRec
+	FileList []*FileRec
+	FileMap  map[string]*FileRec
 
-	FilterFunc func(fr FileRec) bool
+	ByPath []*FileRec
+	BySize []*FileRec
+	ByTime []*FileRec
+
+	AddFunc    func(fr *FileRec)
+	FilterFunc func(fr *FileRec) bool
 
 	FastSearch struct {
 		sha1map map[string]FileList
-		pathmap map[string]FileRec
+		pathmap FileMap
+	}
+
+	Storage struct {
+		Id       string `json:"id" form:"id"`
+		Status   string `json:"status" form:"status"`
+		Access   string `json:"access" form:"access"`
+		Country  string `json:"country" form:"country"`
+		Location string `json:"location" form:"location"`
 	}
 )
 
 var (
-	ErrLongLine = errors.New("Long line")
+	ErrLongLine     = errors.New("Long line")
+	ErrFileModified = errors.New("The file have been modified")
 )
 
 func (a ByPath) Len() int           { return len(a) }
@@ -40,7 +55,7 @@ func (a ByTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByTime) Less(i, j int) bool { return a[i].Mtime < a[j].Mtime }
 
 // Equal comapres two records and returns True in case all fields are equal
-func (fr FileRec) Equal(or FileRec) bool {
+func (fr *FileRec) Equal(or *FileRec) bool {
 	if fr.Size == or.Size && fr.Mtime == or.Mtime && fr.Sha1 == or.Sha1 && fr.Path == or.Path {
 		return true
 	}

@@ -21,8 +21,9 @@ func NewRegexpFilter(expr string) FileFilter {
 	return RegexpFilter{re: re}
 }
 
-func Readdir(path string) (fl FileList, err error) {
+func Readdir(path string) (dir Directory, err error) {
 	var f *os.File
+	fl := []os.FileInfo{}
 	f, err = os.Open(path)
 	if err == nil {
 		defer f.Close()
@@ -31,37 +32,119 @@ func Readdir(path string) (fl FileList, err error) {
 			fl = []os.FileInfo{}
 		}
 	}
-	return fl, err
+	return Directory{path, fl}, err
 }
 
-func ReaddirMatch(path string, filter FileFilter) (fl []os.FileInfo, err error) {
-	fl, err = Readdir(path)
+func ReaddirMatch(path string, filter FileFilter) (dir Directory, err error) {
+	dir, err = Readdir(path)
 	if err != nil {
-		return fl, err
+		return dir, err
 	}
 
-	res := make([]os.FileInfo, 0, 10)
-	for _, fi := range fl {
+	fl := make([]os.FileInfo, 0, 10)
+	for _, fi := range dir.List {
 		if filter.Match(fi) {
-			res = append(res, fi)
+			fl = append(fl, fi)
 		}
 	}
-	return res, nil
+	return Directory{path, fl}, nil
 }
 
-//func Collect(path string, shift string) {
-//	f, err := os.Open(path)
-//	if err == nil {
-//		defer f.Close()
-//		var fi []os.FileInfo
-//		fi, err = f.Readdir(-1)
-//		if err == nil {
-//			for _, v := range fi {
-//				fmt.Println(shift + v.Name())
-//				if v.IsDir() {
-//					Collect(path+"/"+v.Name(), shift+"  ")
-//				}
+// Collect files recursively
+func Collect(path string) (FileTree, error) {
+	ft := make(FileTree, 0)
+	dir, err := Readdir(path)
+	if err != nil {
+		return ft, err
+	}
+
+	fl := make([]os.FileInfo, 0, 10)
+	for _, fi := range dir.List {
+		if fi.IsDir() {
+			f, e := Collect(dir.Path + "/" + fi.Name())
+			if e == nil {
+				ft = append(ft, f...)
+			}
+		}
+		if fi.Mode().IsRegular() {
+			fl = append(fl, fi)
+		}
+	}
+	ft = append(ft, Directory{path, fl})
+
+	return ft, nil
+}
+
+func (dir Directory) FullPath(fi os.FileInfo) string {
+	return dir.Path + "/" + fi.Name()
+}
+
+func (ft FileTree) Files() []string {
+	files := make([]string, 0, 10)
+	for _, dir := range ft {
+		for _, fi := range dir.List {
+			if fi.Mode().IsRegular() {
+				files = append(files, dir.FullPath(fi))
+			}
+		}
+	}
+	return files
+}
+
+type (
+	Concurrency struct {
+		current uint32
+		limit   uint32
+	}
+)
+
+func (c *Concurrency) Get() bool {
+	if c.current >= c.limit {
+		return false
+	}
+	c.limit++
+	return true
+}
+
+func (c *Concurrency) Done() {
+	if c.current > 0 {
+		c.current--
+	}
+}
+
+func (c *Concurrency) Wait() {
+
+}
+
+//func collect(path string, concurrency *int32) {
+//	if f, err := os.Open(path); err != nil {
+//		return err
+//	}
+
+//	files, err := f.Readdir(-1)
+//	f.Close()
+//	if err != nil {
+//		return err
+//	}
+
+//	for _, x := range files {
+//		if x.IsDir() {
+//			p := path + "/" + x.Name()
+//			z := atomic.AddInt64(&Concurency, -1)
+//			if z > 0 {
+//				go func() {
+//					readdir(p)
+//					atomic.AddInt64(&Concurency, 1)
+//				}()
+//			} else {
+//				atomic.AddInt64(&Concurency, 1)
+//				readdir(p)
 //			}
 //		}
 //	}
+//}
+
+//func Collect(path string) error {
+//	concurrency := 5
+
 //}

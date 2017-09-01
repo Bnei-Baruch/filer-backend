@@ -25,7 +25,7 @@ func init() {
 	}
 }
 
-func newfs() FastSearch {
+func newfs() *FastSearch {
 	fs := NewFastSearch()
 	for _, l := range ll {
 		fs.AddList(l)
@@ -33,7 +33,7 @@ func newfs() FastSearch {
 	return fs
 }
 
-func check(t *testing.T, fs FastSearch, pathexpected int, sha1expected int) {
+func check(t *testing.T, fs *FastSearch, pathexpected int, sha1expected int) {
 	if pathexpected != len(fs.pathmap) {
 		t.Errorf("'pathmap' records = %d, expected %d", len(fs.pathmap), pathexpected)
 	}

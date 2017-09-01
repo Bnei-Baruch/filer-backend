@@ -1,11 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"kbb1.com/fileindex"
+	"kbb1.com/fileutils"
 
 	"github.com/labstack/echo"
 	"golang.org/x/sync/syncmap"
@@ -23,7 +30,7 @@ type (
 	}
 
 	UpdateReq struct {
-		Path string `json:"path" form:"url"`
+		Path string `json:"path" form:"path"`
 	}
 )
 
@@ -32,11 +39,16 @@ var (
 	srvConf ServerConf
 )
 
-func getfs() (fs fileindex.FastSearch) {
-	srvConf.Index.Lock()
-	fs = srvConf.Index.FS
-	srvConf.Index.Unlock()
-	return
+func getfs() *fileindex.FastSearch {
+	return srvConf.Index.GetFS()
+}
+
+func search(sha1 string) (fileindex.FileList, bool) {
+	return srvConf.Index.GetFS().Search(sha1)
+}
+
+func setfs(fs *fileindex.FastSearch) {
+	srvConf.Index.SetFS(fs)
 }
 
 func getHello(c echo.Context) error {
@@ -49,10 +61,9 @@ func getFile(c echo.Context) error {
 	name := c.Param("name")
 	key := sha1sum + "/" + name
 	if _, ok := fileMap.Load(key); ok {
-		fs := getfs()
-		if fl, ok := fs.Search(sha1sum); ok {
-			log.Println(fl[0].Path)
+		if fl, ok := search(sha1sum); ok {
 			c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
+			c.Response().Header().Set(echo.HeaderContentDisposition, "attachment")
 			return c.File(fl[0].Path)
 		}
 	}
@@ -65,8 +76,7 @@ func postRegFile(c echo.Context) (err error) {
 		return c.NoContent(http.StatusBadRequest)
 	}
 	if r.SHA1 != "" && r.Name != "" {
-		fs := getfs()
-		if _, ok := fs.Search(r.SHA1); ok {
+		if _, ok := search(r.SHA1); ok {
 			key := r.SHA1 + "/" + r.Name
 			fileMap.Store(key, time.Now().Unix())
 			res := new(RegFileResp)
@@ -78,12 +88,12 @@ func postRegFile(c echo.Context) (err error) {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// POST /api/v1/update
 func postUpdate(c echo.Context) (err error) {
 	r := new(UpdateReq)
 	if err = c.Bind(r); err != nil {
 		return c.NoContent(http.StatusBadRequest)
 	}
-
 	if r.Path == "" {
 		return c.NoContent(http.StatusBadRequest)
 	}
@@ -92,6 +102,39 @@ func postUpdate(c echo.Context) (err error) {
 		srvConf.Update <- r.Path
 	}
 	return c.NoContent(http.StatusOK)
+}
+
+// GET /api/v1/catalog
+func getCatalog(c echo.Context) (err error) {
+	buf := new(bytes.Buffer)
+	files := getfs().GetAll()
+	for _, fl := range files {
+		storages := make([]string, 0, len(fl))
+		for _, fr := range fl {
+			if fr.Device == nil {
+				fmt.Println("Wrong device:", fr.Path)
+			} else {
+				storages = append(storages, fr.Device.Id)
+			}
+		}
+		storagesJson, _ := json.Marshal(storages)
+		fmt.Fprintf(buf, "%s,%s\n", fl[0].Sha1, storagesJson)
+	}
+
+	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
+	return c.Blob(http.StatusOK, "text/plain", buf.Bytes())
+}
+
+// GET /api/v1/storages
+func getStorages(c echo.Context) (err error) {
+	ll := make([]fileindex.Storage, 0, 100)
+	storages.Range(func(key, value interface{}) bool {
+		st := value.(*fileindex.Storage)
+		ll = append(ll, *st)
+		return true
+	})
+	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
+	return c.JSON(http.StatusOK, ll)
 }
 
 func webServer(conf ServerConf) {
@@ -103,10 +146,26 @@ func webServer(conf ServerConf) {
 	e.GET("/", getHello)
 	e.GET("/get/:sha1/:name", getFile)
 
+	e.GET("/api/v1/catalog", getCatalog)
 	e.POST("/api/v1/get", postRegFile)
+	e.GET("/api/v1/storages", getStorages)
 	e.POST("/api/v1/update", postUpdate)
 
 	e.Logger.Fatal(e.Start(srvConf.Listen))
+}
+
+func pathTranslate(path string) string {
+	path = strings.Replace(path, "\\", "/", -1)
+	if x := strings.Index(path, "/Archive/"); x >= 0 {
+		path = srvConf.BasePathArchive + path[x:]
+	} else if x := strings.Index(path, "/Archive_PN/"); x >= 0 {
+		path = srvConf.BasePathArchive + path[x:]
+	} else if x := strings.Index(path, "/__BACKUP/"); x >= 0 {
+		path = "/net/server/original" + path[x:]
+	} else {
+		path = ""
+	}
+	return path
 }
 
 func updateServer(conf UpdateConf) {
@@ -115,11 +174,56 @@ func updateServer(conf UpdateConf) {
 		select {
 		case <-tick:
 			if conf.Index.IsModified() {
-				log.Println("Reload indexes")
+				log.Println("Debug: Reload indexes")
 				conf.Index.Load()
 			}
 		case path := <-conf.Update:
-			log.Println("Update:", path)
+			pathtr := pathTranslate(path)
+			if pathtr == "" {
+				log.Println("Update (unknown path):", path)
+				continue
+			}
+			log.Println("Update:", pathtr)
+
+			if stat, err := os.Lstat(pathtr); err == nil {
+				mtime := stat.ModTime().Unix()
+				size := stat.Size()
+
+				fs := getfs()
+				fr, ok := fs.SearchPath(pathtr)
+				if ok && fr.Size == size && fr.Mtime == mtime {
+					continue
+				}
+
+				fr = &fileindex.FileRec{
+					Path:  pathtr,
+					Size:  size,
+					Mtime: mtime,
+				}
+				if !filter(fr, nil) {
+					continue
+				}
+
+				sha1, _, stat2, err := fileutils.SHA1_File(pathtr)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+
+				if stat2.Size() != stat.Size() && stat2.ModTime() != stat2.ModTime() {
+					log.Println("Update (being modified):", pathtr)
+					continue
+				}
+
+				fr.Sha1 = hex.EncodeToString(sha1)
+				log.Println("SHA1:", fr.Sha1)
+
+				fsdup := fs.Duplicate()
+				fsdup.Update(fr)
+				setfs(fsdup)
+			} else {
+				log.Println(err)
+			}
 		}
 	}
 }
