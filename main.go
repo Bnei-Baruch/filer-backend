@@ -34,14 +34,17 @@ type (
 	ServerConf struct {
 		BasePathArchive  string
 		BasePathOriginal string
-		BaseURL          string // Base URL of the secure file access
+		BaseURL          string // base URL of the secure file access
 		Listen           string
-		TransDest        string // Traget folder for transcoded files
-		TransWork        string // Working folder for transcoder
+		NotifyStation    string // notify station
+		NotifyUser       string // notify user
+		TransDest        string // target folder for transcoded files
+		TransNotify      string // notify MDB app
+		TransWork        string // working folder for transcoder
 	}
 
 	TranscoderConf struct {
-		Concurrency int // Max number of concurrent transcoding processes
+		Concurrency int // max number of concurrent transcoding processes
 	}
 
 	ServerCtx struct {
@@ -52,7 +55,8 @@ type (
 	}
 
 	UpdateConf struct {
-		Reload time.Duration // Rescan interval of the index folder
+		BaseDir string
+		Reload  time.Duration // rescan interval of the index folder
 	}
 
 	UpdateCtx struct {
@@ -126,7 +130,13 @@ func main() {
 	conf.Server.BasePathOriginal = config.Get("server.basepath.Original").(string)
 	conf.Server.BaseURL = config.Get("server.baseurl").(string)
 	conf.Server.Listen = config.Get("server.listen").(string)
-	conf.Update.Reload = config.GetDefault("server.reload", time.Duration(10)).(time.Duration) * time.Second
+
+	conf.Server.TransNotify = config.GetDefault("mdbapp.api", "").(string)
+	conf.Server.NotifyStation = config.GetDefault("mdbapp.station", "").(string)
+	conf.Server.NotifyUser = config.GetDefault("mdbapp.user", "").(string)
+
+	conf.Update.BaseDir = config.GetDefault("update.basedir", "/").(string)
+	conf.Update.Reload = time.Duration(config.GetDefault("update.reload", int64(10)).(int64)) * time.Second
 
 	conf.Transcoder.Concurrency = int(config.GetDefault("transcoder.concurrency", int64(0)).(int64))
 	if conf.Transcoder.Concurrency > 0 {

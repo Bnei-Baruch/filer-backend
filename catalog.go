@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"kbb1.com/fileindex"
@@ -71,6 +72,7 @@ func (idx *IndexMain) GetFS() (fs *fileindex.FastSearch) {
 
 func (idx *IndexMain) IsModified() bool {
 	indexes := GetIndexList(idx.Path)
+	now := time.Now().Unix()
 
 	idx.Lock()
 	list := idx.List
@@ -80,6 +82,11 @@ func (idx *IndexMain) IsModified() bool {
 		return true
 	}
 	for _, idxfile := range indexes {
+		// ignore files modified within last 5s
+		if now-idxfile.Mtime < 5 {
+			continue
+		}
+
 		il := list.FindPath(idxfile.Path)
 		if il == nil || il.Mtime != idxfile.Mtime {
 			return true

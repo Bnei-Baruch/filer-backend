@@ -206,8 +206,6 @@ func pathTranslate(path string) string {
 		path = srvCtx.Config.BasePathArchive + path[x:]
 	} else if x := strings.Index(path, "/__BACKUP/"); x >= 0 {
 		path = srvCtx.Config.BasePathOriginal + path[x:]
-	} else {
-		path = ""
 	}
 	return path
 }
@@ -222,7 +220,7 @@ func updateServer(ctx UpdateCtx) {
 			}
 		case path := <-ctx.Update:
 			pathtr := pathTranslate(path)
-			if pathtr == "" {
+			if !strings.HasPrefix(pathtr, ctx.Config.BaseDir) {
 				log.Println("Update (unknown path):", path)
 				continue
 			}
@@ -299,6 +297,7 @@ func handleResult(t TranscodeTask) {
 		return
 	}
 
+	// finalize the name of the transcoded file in the working folder
 	tgtPath := path.Dir(t.Target) + "/" + req.SHA1 + "_" + hex.EncodeToString(sum) + ".mp4"
 	err = os.Rename(t.Target, tgtPath)
 	if err != nil {
@@ -306,6 +305,7 @@ func handleResult(t TranscodeTask) {
 		return
 	}
 
+	// make a hard link from the working folder to the destination folder
 	srcBase := path.Base(t.Source)
 	destBase := srcBase[0:len(srcBase)-len(path.Ext(srcBase))] + ".mp4"
 
@@ -316,22 +316,25 @@ func handleResult(t TranscodeTask) {
 		return
 	}
 
-	m := map[string]interface{}{
-		"original_sha1": req.SHA1,
-		"sha1":          hex.EncodeToString(sum),
-		"file_name":     destBase,
-		"size":          size,
-		"created_at":    stat.ModTime().Unix(),
-		"station":       "files.kabbalahmedia.info",
-		"user":          "operator@dev.com",
+	// send the transcoding result to MDB application
+	if len(srvCtx.Config.TransNotify) > 0 {
+		m := map[string]interface{}{
+			"original_sha1": req.SHA1,
+			"sha1":          hex.EncodeToString(sum),
+			"file_name":     destBase,
+			"size":          size,
+			"created_at":    stat.ModTime().Unix(),
+			"station":       srvCtx.Config.NotifyStation,
+			"user":          srvCtx.Config.NotifyUser,
+		}
+		sendNotify(srvCtx.Config.TransNotify, m)
 	}
-	sendNotify(m)
 }
 
-func sendNotify(m map[string]interface{}) {
+func sendNotify(api string, m map[string]interface{}) {
 	mJson, _ := json.Marshal(m)
 	contentReader := bytes.NewReader(mJson)
-	req, _ := http.NewRequest("POST", "http://app.mdb.bbdomain.org/operations/transcode", contentReader)
+	req, _ := http.NewRequest("POST", api, contentReader)
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
