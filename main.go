@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"kbb1.com/fileindex"
+	"kbb1.com/fileutils"
 
 	"github.com/pelletier/go-toml"
 )
@@ -31,17 +32,32 @@ type (
 	}
 
 	ServerConf struct {
-		BasePathArchive string
-		BaseURL         string
-		Listen          string
+		BasePathArchive  string
+		BasePathOriginal string
+		BaseURL          string // Base URL of the secure file access
+		Listen           string
+		TransDest        string // Traget folder for transcoded files
+		TransWork        string // Working folder for transcoder
+	}
 
+	TranscoderConf struct {
+		Concurrency int // Max number of concurrent transcoding processes
+	}
+
+	ServerCtx struct {
+		Config *ServerConf
 		Index  *IndexMain
 		Update chan string
+		Trans  Transcoder
 	}
 
 	UpdateConf struct {
+		Reload time.Duration // Rescan interval of the index folder
+	}
+
+	UpdateCtx struct {
+		Config *UpdateConf
 		Index  *IndexMain
-		Reload time.Duration
 		Update chan string
 	}
 )
@@ -59,7 +75,7 @@ func configLoad() *toml.Tree {
 			config, err = toml.LoadFile(globalConf)
 		}
 		if err != nil {
-			log.Fatalln("Error: ", err)
+			log.Fatalln("Load config file: ", err)
 		}
 	}
 	return config
@@ -75,6 +91,7 @@ func signalHandler() chan os.Signal {
 	return signalChan
 }
 
+// Stop the program in case the executable file is updated
 func stoponupdate(ch chan os.Signal) {
 	prog, _ := filepath.Abs(os.Args[0])
 	stat, _ := os.Stat(prog)
@@ -95,24 +112,47 @@ func stoponupdate(ch chan os.Signal) {
 	}
 }
 
+var conf struct {
+	Server     ServerConf
+	Transcoder TranscoderConf
+	Update     UpdateConf
+}
+
 func main() {
 	signalChan := signalHandler()
 
 	config := configLoad()
-	basepathArchive := config.Get("server.basepath.Archive").(string)
-	baseurl := config.Get("server.baseurl").(string)
-	listen := config.Get("server.listen").(string)
-	reload := config.GetDefault("server.reload", time.Duration(10)).(time.Duration) * time.Second
-	path := config.Get("index.dir").(string)
-	update := make(chan string, 100)
+	conf.Server.BasePathArchive = config.Get("server.basepath.Archive").(string)
+	conf.Server.BasePathOriginal = config.Get("server.basepath.Original").(string)
+	conf.Server.BaseURL = config.Get("server.baseurl").(string)
+	conf.Server.Listen = config.Get("server.listen").(string)
+	conf.Update.Reload = config.GetDefault("server.reload", time.Duration(10)).(time.Duration) * time.Second
+
+	conf.Transcoder.Concurrency = int(config.GetDefault("transcoder.concurrency", int64(0)).(int64))
+	if conf.Transcoder.Concurrency > 0 {
+		conf.Server.TransDest = fileutils.AddSlash(config.Get("server.transdest").(string))
+		conf.Server.TransWork = fileutils.AddSlash(config.Get("server.transwork").(string))
+	}
+
+	log.SetOutput(fileutils.NewLogWriter(fileutils.LogCtx{
+		Path: config.GetDefault("server.log", "").(string),
+	}))
 
 	InitStorages()
-	index := NewIndex(path)
-	index.Load()
 
-	go webServer(ServerConf{Listen: listen, BasePathArchive: basepathArchive, BaseURL: baseurl, Index: index, Update: update})
-	go updateServer(UpdateConf{Index: index, Reload: reload, Update: update})
-	go stoponupdate(signalChan)
+	index := NewIndex(config.Get("index.dir").(string))
+	index.Load()
+	update := make(chan string, 100)
+
+	tr := NewMultiTranscoder(conf.Transcoder.Concurrency)
+
+	go webServer(ServerCtx{Config: &conf.Server, Index: index, Update: update, Trans: tr})
+	go updateServer(UpdateCtx{Config: &conf.Update, Index: index, Update: update})
+	go transcodeResult(tr)
+
+	if config.GetDefault("server.stoponupdate", false).(bool) == true {
+		go stoponupdate(signalChan)
+	}
 
 	_ = <-signalChan
 }

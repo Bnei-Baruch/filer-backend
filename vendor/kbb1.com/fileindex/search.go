@@ -13,7 +13,9 @@ func (fs *FastSearch) Add(fr *FileRec) {
 	} else {
 		fs.sha1map[fr.Sha1] = []*FileRec{fr}
 	}
-	fs.pathmap[fr.Path] = fr
+	if fr.Device != nil && fr.Device.Country == "il" && fr.Device.Status == "online" {
+		fs.pathmap[fr.Path] = fr
+	}
 }
 
 func (fs *FastSearch) AddList(fl FileList) {

@@ -22,6 +22,16 @@ type (
 		io.Writer
 		SHA1
 	}
+
+	LogCtx struct {
+		Path   string
+		Reopen int
+		out    io.WriteCloser
+	}
+
+	LogWriter struct {
+		ctx LogCtx
+	}
 )
 
 type (
@@ -46,6 +56,13 @@ type (
 		re *regexp.Regexp
 	}
 )
+
+func AddSlash(path string) string {
+	if len(path) > 0 && path[len(path)-1] != '/' {
+		return path + "/"
+	}
+	return path
+}
 
 func FileTouch(src *os.File, dst string) error {
 	s, err := src.Stat()

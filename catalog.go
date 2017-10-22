@@ -2,16 +2,14 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"unsafe"
-
-	"golang.org/x/sync/syncmap"
 
 	"kbb1.com/fileindex"
 	"kbb1.com/fileutils"
@@ -22,7 +20,7 @@ var (
 	reTape *regexp.Regexp
 	reWIN  *regexp.Regexp
 
-	storages syncmap.Map
+	storages sync.Map
 )
 
 func InitStorages() {
@@ -90,6 +88,7 @@ func (idx *IndexMain) IsModified() bool {
 	return false
 }
 
+// Load all indexes recursively. Reload an index if modification time is changed.
 func (idx *IndexMain) Load() {
 	indexes := GetIndexList(idx.Path)
 
@@ -145,7 +144,7 @@ func filter(fr *fileindex.FileRec, storage *fileindex.Storage) bool {
 		dirs = dirs[1:]
 	}
 	if len(dirs) < 2 {
-		fmt.Println("Wrong path:", fr.Path)
+		log.Println("Wrong path:", fr.Path)
 		return false
 	}
 
@@ -194,7 +193,7 @@ func filter(fr *fileindex.FileRec, storage *fileindex.Storage) bool {
 	}
 
 	if id == "unknown" {
-		fmt.Println("Unknown storage:", fr.Path, fr.Sha1)
+		log.Println("Unknown storage:", fr.Path, fr.Sha1)
 	}
 
 	storage = &fileindex.Storage{

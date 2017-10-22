@@ -6,8 +6,7 @@ import (
 	"errors"
 	"io"
 	"sort"
-
-	"golang.org/x/sync/syncmap"
+    "sync"
 )
 
 const newListCapacity = 1000
@@ -74,13 +73,13 @@ func LoadMap(r *bufio.Reader, filter FilterFunc) (FileMap, error) {
 	return fl, err
 }
 
-func LoadSyncMap(r *bufio.Reader, filter FilterFunc) (syncmap.Map, error) {
-	var fl syncmap.Map
+func LoadSyncMap(r *bufio.Reader, filter FilterFunc) (sync.Map, error) {
+	var fl sync.Map
 	err := load(r, filter, func(fr *FileRec) {
 		fl.Store(fr.Path, fr)
 	})
 	if err != nil {
-		fl = syncmap.Map{}
+		fl = sync.Map{}
 	}
 	return fl, err
 }

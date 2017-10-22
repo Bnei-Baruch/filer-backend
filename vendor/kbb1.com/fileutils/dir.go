@@ -143,8 +143,3 @@ func (c *Concurrency) Wait() {
 //		}
 //	}
 //}
-
-//func Collect(path string) error {
-//	concurrency := 5
-
-//}
