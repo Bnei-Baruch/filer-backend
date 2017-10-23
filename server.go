@@ -275,6 +275,11 @@ func transcodeResult(tr Transcoder) {
 		if r.Err == nil {
 			handleResult(r.Task)
 		} else {
+			req, ok := r.Task.Ctx.(*TranscodeReq)
+			if ok {
+				sendError(req.SHA1, string(r.Out))
+			}
+
 			log.Println("Transcode:", r.Task.Source)
 			log.Println("To:", r.Task.Target)
 			log.Println("Preset:", r.Task.Preset)
@@ -293,6 +298,7 @@ func handleResult(t TranscodeTask) {
 
 	sum, size, stat, err := fileutils.SHA1_File(t.Target)
 	if err != nil {
+		sendError(req.SHA1, err.Error())
 		log.Println(err)
 		return
 	}
@@ -302,6 +308,7 @@ func handleResult(t TranscodeTask) {
 	err = os.Rename(t.Target, tgtPath)
 	if err != nil {
 		log.Println(err)
+		sendError(req.SHA1, err.Error())
 		return
 	}
 
@@ -309,12 +316,16 @@ func handleResult(t TranscodeTask) {
 	srcBase := path.Base(t.Source)
 	destBase := srcBase[0:len(srcBase)-len(path.Ext(srcBase))] + ".mp4"
 
-	destPath := srvCtx.Config.TransDest + "/" + destBase
+	destPath := srvCtx.Config.TransDest + destBase
 	err = os.Link(tgtPath, destPath)
 	if err != nil {
 		log.Println(err)
+		sendError(req.SHA1, err.Error())
 		return
 	}
+
+	// send update notify to indexer
+	srvCtx.Update <- destPath
 
 	// send the transcoding result to MDB application
 	if len(srvCtx.Config.TransNotify) > 0 {
@@ -329,6 +340,14 @@ func handleResult(t TranscodeTask) {
 		}
 		sendNotify(srvCtx.Config.TransNotify, m)
 	}
+}
+
+func sendError(sha1 string, msg string) {
+	m := map[string]interface{}{
+		"original_sha1": sha1,
+		"message":       msg,
+	}
+	sendNotify(srvCtx.Config.TransNotify, m)
 }
 
 func sendNotify(api string, m map[string]interface{}) {
