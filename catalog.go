@@ -164,7 +164,7 @@ func filter(fr *fileindex.FileRec, storage *fileindex.Storage) bool {
 			id = "disk-" + dirs[1]
 			status = "nearline"
 		} else {
-			id = "f1-" + dirs[1]
+			id = conf.Location.Hostname + "-" + dirs[1]
 			status = "online"
 		}
 	case "net":
@@ -206,9 +206,9 @@ func filter(fr *fileindex.FileRec, storage *fileindex.Storage) bool {
 	storage = &fileindex.Storage{
 		Id:       id,
 		Status:   status,
-		Access:   "local",
-		Country:  "il",
-		Location: "merkaz",
+		Access:   conf.Location.Access,
+		Country:  conf.Location.Country,
+		Location: conf.Location.Name,
 	}
 	storages.Store(id, storage)
 	fr.Device = storage

@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"log"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"kbb1.com/fileutils"
 )
 
 type (
@@ -70,11 +74,19 @@ func transcodeFile(preset, srcpath, dstpath string) (error, []byte) {
 	return err, out.Bytes()
 }
 
+func transcodeLog(start, finish time.Time, r *TranscodeResult) {
+	if r.Err == nil {
+		log.Println("Transcode:", finish.Sub(start)/time.Millisecond*time.Millisecond, fileutils.FileSize(r.Task.Source), r.Task.Source)
+	}
+}
+
 func transcodeRun(qt <-chan TranscodeTask, qr chan<- TranscodeResult) {
 	go func() {
 		for t := range qt {
+			start := time.Now()
 			r := TranscodeResult{Task: t}
 			r.Err, r.Out = transcodeFile(t.Preset, t.Source, t.Target)
+			transcodeLog(start, time.Now(), &r)
 			qr <- r
 		}
 	}()

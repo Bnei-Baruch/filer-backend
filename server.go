@@ -346,6 +346,8 @@ func sendError(sha1 string, msg string) {
 	m := map[string]interface{}{
 		"original_sha1": sha1,
 		"message":       msg,
+		"station":       srvCtx.Config.NotifyStation,
+		"user":          srvCtx.Config.NotifyUser,
 	}
 	sendNotify(srvCtx.Config.TransNotify, m)
 }

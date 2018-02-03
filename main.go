@@ -64,6 +64,13 @@ type (
 		Index  *IndexMain
 		Update chan string
 	}
+
+	LocationConf struct {
+		Access   string
+		Country  string
+		Hostname string
+		Name     string
+	}
 )
 
 const (
@@ -117,6 +124,7 @@ func stoponupdate(ch chan os.Signal) {
 }
 
 var conf struct {
+	Location   LocationConf
 	Server     ServerConf
 	Transcoder TranscoderConf
 	Update     UpdateConf
@@ -134,6 +142,11 @@ func main() {
 	conf.Server.TransNotify = config.GetDefault("mdbapp.api", "").(string)
 	conf.Server.NotifyStation = config.GetDefault("mdbapp.station", "").(string)
 	conf.Server.NotifyUser = config.GetDefault("mdbapp.user", "").(string)
+
+	conf.Location.Access = config.GetDefault("location.access", "local").(string)
+	conf.Location.Country = config.GetDefault("location.country", "unknown").(string)
+	conf.Location.Name = config.GetDefault("location.name", "unknown").(string)
+	conf.Location.Hostname = fileutils.BaseHostName()
 
 	conf.Update.BaseDir = config.GetDefault("update.basedir", "/").(string)
 	conf.Update.Reload = time.Duration(config.GetDefault("update.reload", int64(10)).(int64)) * time.Second

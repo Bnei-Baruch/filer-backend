@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -73,4 +74,19 @@ func FileTouch(src *os.File, dst string) error {
 		}
 	}
 	return err
+}
+
+func IntIndex(x int, defvalue int) int {
+	if x < 0 {
+		return defvalue
+	}
+	return x
+}
+
+func BaseHostName() string {
+	h, e := os.Hostname()
+	if e == nil {
+		return h[0:IntIndex(strings.IndexRune(h, '.'), len(h))]
+	}
+	return "localhost"
 }
