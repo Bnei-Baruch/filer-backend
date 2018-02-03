@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"kbb1.com/transcode"
 
 	"github.com/labstack/echo"
-	"github.com/satori/go.uuid"
 )
 
 type (
@@ -31,6 +29,10 @@ type (
 
 	RegFileResp struct {
 		URL string `json:"url" form:"url"`
+	}
+
+	ShowFormatReq struct {
+		SHA1 string `json:"sha1" form:"sha1"`
 	}
 
 	TranscodeReq struct {
@@ -97,107 +99,6 @@ func getFile(c echo.Context) error {
 	return c.NoContent(http.StatusNotFound)
 }
 
-// POST /api/v1/get
-func postRegFile(c echo.Context) (err error) {
-	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
-
-	r := new(RegFileReq)
-	if err = c.Bind(r); err != nil {
-		return c.NoContent(http.StatusBadRequest)
-	}
-	if r.SHA1 != "" && r.Name != "" {
-		if _, ok := search(r.SHA1); ok {
-			key := r.SHA1 + "/" + r.Name
-			fileMap.Store(key, time.Now().Unix())
-			res := new(RegFileResp)
-			res.URL = srvCtx.Config.BaseURL + key
-			return c.JSON(http.StatusOK, res)
-		}
-	}
-	return c.NoContent(http.StatusNoContent)
-}
-
-// POST /api/v1/transcode
-func postTranscode(c echo.Context) (err error) {
-	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
-
-	r := new(TranscodeReq)
-	if err = c.Bind(r); err != nil {
-		return c.String(http.StatusBadRequest, "Wrong parameters")
-	}
-	if r.SHA1 == "" || r.Format != "mp4" {
-		return c.String(http.StatusBadRequest, "Wrong parameters")
-	}
-
-	if fl, ok := search(r.SHA1); ok {
-		var task transcode.TranscodeTask
-		task.Source = fl[0].Path
-		task.Preset = presetByExt(task.Source)
-		if task.Preset == "" {
-			return c.String(http.StatusBadRequest, "No preset")
-		}
-		task.Target = fileutils.AddSlash(srvCtx.Config.TransWork) + uuid.NewV4().String() + ".mp4"
-		task.Ctx = r
-		if !srvCtx.Trans.Transcode(task) {
-			return c.String(http.StatusBadRequest, "Cannot start transcoding")
-		}
-	} else {
-		return c.NoContent(http.StatusNotFound)
-	}
-	return c.NoContent(http.StatusOK)
-}
-
-// POST /api/v1/update
-func postUpdate(c echo.Context) (err error) {
-	r := new(UpdateReq)
-	if err = c.Bind(r); err != nil {
-		return c.NoContent(http.StatusBadRequest)
-	}
-	if r.Path == "" {
-		return c.NoContent(http.StatusBadRequest)
-	}
-
-	if srvCtx.Update != nil {
-		srvCtx.Update <- r.Path
-	}
-	return c.NoContent(http.StatusOK)
-}
-
-// GET /api/v1/catalog
-func getCatalog(c echo.Context) (err error) {
-	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
-
-	buf := new(bytes.Buffer)
-	files := getfs().GetAll()
-	for _, fl := range files {
-		storages := make([]string, 0, len(fl))
-		for _, fr := range fl {
-			if fr.Device == nil {
-				log.Println("Wrong device:", fr.Path)
-			} else {
-				storages = append(storages, fr.Device.Id)
-			}
-		}
-		storagesJson, _ := json.Marshal(storages)
-		fmt.Fprintf(buf, "%s,%s\n", fl[0].Sha1, storagesJson)
-	}
-
-	return c.Blob(http.StatusOK, "text/plain", buf.Bytes())
-}
-
-// GET /api/v1/storages
-func getStorages(c echo.Context) (err error) {
-	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
-
-	ll := make([]fileindex.Storage, 0, 100)
-	storages.Range(func(key, value interface{}) bool {
-		st := value.(*fileindex.Storage)
-		ll = append(ll, *st)
-		return true
-	})
-	return c.JSON(http.StatusOK, ll)
-}
-
 func webServer(ctx ServerCtx) {
 	srvCtx = ctx
 
@@ -210,6 +111,7 @@ func webServer(ctx ServerCtx) {
 	e.GET("/api/v1/catalog", getCatalog)
 	e.POST("/api/v1/get", postRegFile)
 	e.GET("/api/v1/storages", getStorages)
+	e.POST("/api/v1/showformat", postShowFormat)
 	e.POST("/api/v1/transcode", postTranscode)
 	e.POST("/api/v1/update", postUpdate)
 
