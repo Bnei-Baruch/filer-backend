@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"kbb1.com/fileindex"
 	"kbb1.com/fileutils"
+	"kbb1.com/transcode"
 
 	"github.com/labstack/echo"
 	"github.com/satori/go.uuid"
@@ -44,7 +46,23 @@ type (
 var (
 	fileMap sync.Map
 	srvCtx  ServerCtx
+
+	preset1 string = "-c:v libx264 -profile:v main -preset fast -b:v 128k -c:a libfdk_aac -b:a 48k"
+	preset2 string = "-c:v libx264 -profile:v main -preset fast -b:v 256k -c:a libfdk_aac -b:a 48k"
 )
+
+func presetByExt(src string) (preset string) {
+	ext := filepath.Ext(src)
+	switch ext {
+	case ".wmv", ".WMV":
+		preset = preset1
+	case ".flv", ".FLV":
+		preset = preset2
+	default:
+		preset = ""
+	}
+	return
+}
 
 func getfs() *fileindex.FastSearch {
 	return srvCtx.Index.GetFS()
@@ -112,7 +130,7 @@ func postTranscode(c echo.Context) (err error) {
 	}
 
 	if fl, ok := search(r.SHA1); ok {
-		var task TranscodeTask
+		var task transcode.TranscodeTask
 		task.Source = fl[0].Path
 		task.Preset = presetByExt(task.Source)
 		if task.Preset == "" {
@@ -269,7 +287,7 @@ func updateServer(ctx UpdateCtx) {
 	}
 }
 
-func transcodeResult(tr Transcoder) {
+func transcodeResult(tr transcode.Transcoder) {
 	for {
 		r := tr.Result()
 		if r.Err == nil {
@@ -289,7 +307,7 @@ func transcodeResult(tr Transcoder) {
 	}
 }
 
-func handleResult(t TranscodeTask) {
+func handleResult(t transcode.TranscodeTask) {
 	req, ok := t.Ctx.(*TranscodeReq)
 	if !ok {
 		log.Println("Wrong transcoding result")

@@ -11,6 +11,7 @@ import (
 
 	"kbb1.com/fileindex"
 	"kbb1.com/fileutils"
+	"kbb1.com/transcode"
 
 	"github.com/pelletier/go-toml"
 )
@@ -51,7 +52,7 @@ type (
 		Config *ServerConf
 		Index  *IndexMain
 		Update chan string
-		Trans  Transcoder
+		Trans  transcode.Transcoder
 	}
 
 	UpdateConf struct {
@@ -167,7 +168,7 @@ func main() {
 	index.Load()
 	update := make(chan string, 100)
 
-	tr := NewMultiTranscoder(conf.Transcoder.Concurrency)
+	tr := transcode.NewMultiTranscoder(conf.Transcoder.Concurrency)
 
 	go webServer(ServerCtx{Config: &conf.Server, Index: index, Update: update, Trans: tr})
 	go updateServer(UpdateCtx{Config: &conf.Update, Index: index, Update: update})

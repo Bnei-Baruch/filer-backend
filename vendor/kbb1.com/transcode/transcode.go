@@ -1,10 +1,9 @@
-package main
+package transcode
 
 import (
 	"bytes"
 	"log"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -38,22 +37,7 @@ type (
 
 var (
 	optargs string = "-hide_banner -nostats -loglevel error -threads 1"
-	preset1 string = "-c:v libx264 -profile:v main -preset fast -b:v 128k -c:a libfdk_aac -b:a 48k"
-	preset2 string = "-c:v libx264 -profile:v main -preset fast -b:v 256k -c:a libfdk_aac -b:a 48k"
 )
-
-func presetByExt(src string) (preset string) {
-	ext := filepath.Ext(src)
-	switch ext {
-	case ".wmv", ".WMV":
-		preset = preset1
-	case ".flv", ".FLV":
-		preset = preset2
-	default:
-		preset = ""
-	}
-	return
-}
 
 func transcodeFile(preset, srcpath, dstpath string) (error, []byte) {
 	params := strings.Fields(optargs)
