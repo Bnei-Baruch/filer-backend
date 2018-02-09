@@ -20,31 +20,6 @@ import (
 	"github.com/labstack/echo"
 )
 
-type (
-	RegFileReq struct {
-		SHA1     string `json:"sha1" form:"sha1"`
-		Name     string `json:"name" form:"name"`
-		ClientIP string `json:"clientip" form:"clientip"`
-	}
-
-	RegFileResp struct {
-		URL string `json:"url" form:"url"`
-	}
-
-	ShowFormatReq struct {
-		SHA1 string `json:"sha1" form:"sha1"`
-	}
-
-	TranscodeReq struct {
-		SHA1   string `json:"sha1" form:"sha1"`
-		Format string `json:"format" form:"format"`
-	}
-
-	UpdateReq struct {
-		Path string `json:"path" form:"path"`
-	}
-)
-
 var (
 	fileMap sync.Map
 	srvCtx  ServerCtx
@@ -132,10 +107,12 @@ func getFile(c echo.Context) error {
 	sha1sum := c.Param("sha1")
 	name := c.Param("name")
 	key := sha1sum + "/" + name
-	if _, ok := fileMap.Load(key); ok {
-		if fl, ok := search(sha1sum); ok {
-			c.Response().Header().Set(echo.HeaderContentDisposition, "attachment")
-			return c.File(fl[0].Path)
+	if reqtime, ok := fileMap.Load(key); ok {
+		if time.Since(reqtime.(time.Time)) < srvCtx.Config.GetFileExpire {
+			if fl, ok := search(sha1sum); ok {
+				c.Response().Header().Set(echo.HeaderContentDisposition, "attachment")
+				return c.File(fl[0].Path)
+			}
 		}
 	}
 	return c.NoContent(http.StatusNotFound)

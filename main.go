@@ -36,6 +36,7 @@ type (
 		BasePathArchive  string
 		BasePathOriginal string
 		BaseURL          string // base URL of the secure file access
+		GetFileExpire    time.Duration
 		Listen           string
 		NotifyStation    string // notify station
 		NotifyUser       string // notify user
@@ -139,6 +140,7 @@ func main() {
 	conf.Server.BasePathOriginal = config.Get("server.basepath.Original").(string)
 	conf.Server.BaseURL = config.Get("server.baseurl").(string)
 	conf.Server.Listen = config.Get("server.listen").(string)
+	conf.Server.GetFileExpire = time.Duration(config.GetDefault("server.getfileexpire", int64(7200)).(int64)) * time.Second
 
 	conf.Server.TransNotify = config.GetDefault("mdbapp.api", "").(string)
 	conf.Server.NotifyStation = config.GetDefault("mdbapp.station", "").(string)

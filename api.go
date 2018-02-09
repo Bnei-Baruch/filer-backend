@@ -15,6 +15,31 @@ import (
 	"kbb1.com/transcode"
 )
 
+type (
+	RegFileReq struct {
+		SHA1     string `json:"sha1" form:"sha1"`
+		Name     string `json:"name" form:"name"`
+		ClientIP string `json:"clientip" form:"clientip"`
+	}
+
+	RegFileResp struct {
+		URL string `json:"url" form:"url"`
+	}
+
+	ShowFormatReq struct {
+		SHA1 string `json:"sha1" form:"sha1"`
+	}
+
+	TranscodeReq struct {
+		SHA1   string `json:"sha1" form:"sha1"`
+		Format string `json:"format" form:"format"`
+	}
+
+	UpdateReq struct {
+		Path string `json:"path" form:"path"`
+	}
+)
+
 // POST /api/v1/get
 func postRegFile(c echo.Context) (err error) {
 	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
@@ -26,7 +51,7 @@ func postRegFile(c echo.Context) (err error) {
 	if r.SHA1 != "" && r.Name != "" {
 		if _, ok := search(r.SHA1); ok {
 			key := r.SHA1 + "/" + r.Name
-			fileMap.Store(key, time.Now().Unix())
+			fileMap.Store(key, time.Now())
 			res := new(RegFileResp)
 			res.URL = srvCtx.Config.BaseURL + key
 			return c.JSON(http.StatusOK, res)
