@@ -73,9 +73,14 @@ func postTranscode(c echo.Context) (err error) {
 	}
 
 	if fl, ok := search(r.SHA1); ok {
+		err, probe := transcode.Probe(fl[0].Path)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+
 		var task transcode.TranscodeTask
 		task.Source = fl[0].Path
-		task.Preset = presetByExt(task.Source)
+		task.Preset = preset(probe)
 		if task.Preset == "" {
 			return c.String(http.StatusBadRequest, "No preset")
 		}
@@ -84,6 +89,7 @@ func postTranscode(c echo.Context) (err error) {
 		if !srvCtx.Trans.Transcode(task) {
 			return c.String(http.StatusBadRequest, "Cannot start transcoding")
 		}
+		return c.NoContent(http.StatusOK)
 	}
 	return c.NoContent(http.StatusNotFound)
 }

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -49,21 +49,63 @@ var (
 	fileMap sync.Map
 	srvCtx  ServerCtx
 
-	preset1 string = "-c:v libx264 -profile:v main -preset fast -b:v 128k -c:a libfdk_aac -b:a 48k"
-	preset2 string = "-c:v libx264 -profile:v main -preset fast -b:v 256k -c:a libfdk_aac -b:a 48k"
+	preset0 string = "-c:v libx264 -profile:v main -preset fast -b:v %dk %s -c:a libfdk_aac -b:a %dk"
 )
 
-func presetByExt(src string) (preset string) {
-	ext := filepath.Ext(src)
-	switch ext {
-	case ".wmv", ".WMV":
-		preset = preset1
-	case ".flv", ".FLV":
-		preset = preset2
-	default:
-		preset = ""
+func preset(probe *transcode.FFprobe) string {
+	audio, video := streams(probe)
+	if audio == nil || video == nil {
+		return ""
 	}
-	return
+
+	abitrate := 64
+	if audio.Channels == 1 {
+		if audio.BitRate < 40000 {
+			abitrate = 32
+		} else if audio.BitRate < 62000 {
+			abitrate = 48
+		}
+	} else {
+		if audio.BitRate > 90000 {
+			abitrate = 96
+		}
+	}
+
+	vbitrate := 256
+	vr := video.BitRate
+	if vr == 0 {
+		vr = probe.Format.BitRate - audio.BitRate
+	}
+	if vr < 180000 {
+		vbitrate = 128
+	} else if vr > 600000 {
+		vbitrate = 512
+	} else if vr > 400000 {
+		vbitrate = 384
+	}
+
+	vsync := ""
+	if video.FrameRate == "1000/1" {
+		vsync = "-vsync vfr"
+	}
+
+	return fmt.Sprintf(preset0, vbitrate, vsync, abitrate)
+}
+
+func streams(probe *transcode.FFprobe) (audio *transcode.FFstream, video *transcode.FFstream) {
+	if len(probe.Streams) != 2 {
+		return nil, nil
+	}
+
+	if probe.Streams[0].Type == "audio" && probe.Streams[1].Type == "video" {
+		return probe.Streams[0], probe.Streams[1]
+	}
+
+	if probe.Streams[1].Type == "audio" && probe.Streams[0].Type == "video" {
+		return probe.Streams[1], probe.Streams[0]
+	}
+
+	return nil, nil
 }
 
 func getfs() *fileindex.FastSearch {
