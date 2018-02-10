@@ -27,6 +27,7 @@ type (
 	Transcoder interface {
 		Transcode(task TranscodeTask) bool
 		Result() TranscodeResult
+		QueueLen() int
 	}
 
 	MultiTranscoder struct {
@@ -87,6 +88,10 @@ func NewMultiTranscoder(concurrency int) *MultiTranscoder {
 	}
 
 	return mt
+}
+
+func (tr *MultiTranscoder) QueueLen() int {
+	return len(tr.qt)
 }
 
 func (tr *MultiTranscoder) Result() TranscodeResult {

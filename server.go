@@ -132,6 +132,7 @@ func webServer(ctx ServerCtx) {
 	e.GET("/api/v1/storages", getStorages)
 	e.POST("/api/v1/showformat", postShowFormat)
 	e.POST("/api/v1/transcode", postTranscode)
+	e.GET("/api/v1/transqlen", getTransQLen)
 	e.POST("/api/v1/update", postUpdate)
 
 	e.Logger.Fatal(e.Start(srvCtx.Config.Listen))
@@ -254,8 +255,9 @@ func handleResult(t transcode.TranscodeTask) {
 	// make a hard link from the working folder to the destination folder
 	srcBase := path.Base(t.Source)
 	destBase := srcBase[0:len(srcBase)-len(path.Ext(srcBase))] + ".mp4"
-
 	destPath := srvCtx.Config.TransDest + destBase
+
+	os.Remove(destPath)
 	err = os.Link(tgtPath, destPath)
 	if err != nil {
 		log.Println(err)

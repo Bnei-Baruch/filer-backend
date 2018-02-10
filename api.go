@@ -57,7 +57,7 @@ func postRegFile(c echo.Context) (err error) {
 			return c.JSON(http.StatusOK, res)
 		}
 	}
-	return c.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNotFound)
 }
 
 // POST /api/v1/showformat
@@ -83,6 +83,13 @@ func postShowFormat(c echo.Context) (err error) {
 		return c.JSONBlob(http.StatusOK, out)
 	}
 	return c.NoContent(http.StatusNotFound)
+}
+
+// GET /api/v1/transqlen
+func getTransQLen(c echo.Context) (err error) {
+	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
+
+	return c.String(http.StatusOK, fmt.Sprintf("%d\n", srvCtx.Trans.QueueLen()))
 }
 
 // POST /api/v1/transcode
