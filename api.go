@@ -116,7 +116,13 @@ func postTranscode(c echo.Context) (err error) {
 		if task.Preset == "" {
 			return c.String(http.StatusBadRequest, "No preset")
 		}
-		task.Target = fileutils.AddSlash(srvCtx.Config.TransWork) + uuid.NewV4().String() + ".mp4"
+
+		uu, err := uuid.NewV4()
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+
+		task.Target = fileutils.AddSlash(srvCtx.Config.TransWork) + uu.String() + ".mp4"
 		task.Ctx = r
 		if !srvCtx.Trans.Transcode(task) {
 			return c.String(http.StatusBadRequest, "Cannot start transcoding")
