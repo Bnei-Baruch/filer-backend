@@ -126,6 +126,7 @@ func webServer(ctx ServerCtx) {
 
 	e.GET("/", getHello)
 	e.GET("/get/:sha1/:name", getFile)
+	e.HEAD("/get/:sha1/:name", getFile)
 
 	e.GET("/api/v1/catalog", getCatalog)
 	e.POST("/api/v1/get", postRegFile)
