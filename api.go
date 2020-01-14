@@ -46,16 +46,18 @@ func postRegFile(c echo.Context) (err error) {
 
 	r := new(RegFileReq)
 	if err = c.Bind(r); err != nil {
-		return c.NoContent(http.StatusBadRequest)
+		return c.String(http.StatusBadRequest, "Wrong parameters")
 	}
-	if r.SHA1 != "" && r.Name != "" {
-		if _, ok := search(r.SHA1); ok {
-			key := r.SHA1 + "/" + r.Name
-			fileMap.Store(key, time.Now())
-			res := new(RegFileResp)
-			res.URL = srvCtx.Config.BaseURL + key
-			return c.JSON(http.StatusOK, res)
-		}
+	if r.SHA1 == "" || r.Name == "" {
+		return c.String(http.StatusBadRequest, "Wrong parameters")
+	}
+
+	if _, ok := search(r.SHA1); ok {
+		key := r.SHA1 + "/" + r.Name
+		fileMap.Store(key, time.Now())
+		res := new(RegFileResp)
+		res.URL = srvCtx.Config.BaseURL + key
+		return c.JSON(http.StatusOK, res)
 	}
 	return c.NoContent(http.StatusNotFound)
 }
