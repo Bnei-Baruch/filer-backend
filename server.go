@@ -105,14 +105,21 @@ func getFile(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderAccessControlAllowOrigin, "*")
 
 	sha1sum := c.Param("sha1")
-	name := c.Param("name")
-	key := sha1sum + "/" + name
-	if reqtime, ok := fileMap.Load(key); ok {
-		if time.Since(reqtime.(time.Time)) < srvCtx.Config.GetFileExpire {
-			if fl, ok := search(sha1sum); ok {
-				c.Response().Header().Set(echo.HeaderContentDisposition, "attachment")
-				return c.File(fl[0].Path)
+	if srvCtx.Config.VerifyDownload {
+		name := c.Param("name")
+		key := sha1sum + "/" + name
+		if reqtime, ok := fileMap.Load(key); ok {
+			if time.Since(reqtime.(time.Time)) < srvCtx.Config.GetFileExpire {
+				if fl, ok := search(sha1sum); ok {
+					c.Response().Header().Set(echo.HeaderContentDisposition, "attachment")
+					return c.File(fl[0].Path)
+				}
 			}
+		}
+	} else {
+		if fl, ok := search(sha1sum); ok {
+			c.Response().Header().Set(echo.HeaderContentDisposition, "attachment")
+			return c.File(fl[0].Path)
 		}
 	}
 	return c.NoContent(http.StatusNotFound)
