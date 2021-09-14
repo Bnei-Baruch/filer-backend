@@ -43,6 +43,7 @@ type (
 		TransDest        string // target folder for transcoded files
 		TransNotify      string // notify MDB app
 		TransWork        string // working folder for transcoder
+		VerifyDownload   bool   // verify registration for downloads
 	}
 
 	TranscoderConf struct {
@@ -141,6 +142,7 @@ func main() {
 	conf.Server.BaseURL = config.Get("server.baseurl").(string)
 	conf.Server.Listen = config.Get("server.listen").(string)
 	conf.Server.GetFileExpire = time.Duration(config.GetDefault("server.getfileexpire", int64(7200)).(int64)) * time.Second
+	conf.Server.VerifyDownload = config.GetDefault("server.verifydownload", false).(bool)
 
 	conf.Server.TransNotify = config.GetDefault("mdbapp.api", "").(string)
 	conf.Server.NotifyStation = config.GetDefault("mdbapp.station", "").(string)
