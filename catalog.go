@@ -12,8 +12,8 @@ import (
 	"time"
 	"unsafe"
 
-	"kbb1.com/fileindex"
-	"kbb1.com/fileutils"
+	"github.com/Bnei-Baruch/filer-backend/fileindex"
+	"github.com/Bnei-Baruch/filer-backend/fileutils"
 )
 
 var (

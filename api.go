@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Bnei-Baruch/filer-backend/fileindex"
+	"github.com/Bnei-Baruch/filer-backend/fileutils"
+	"github.com/Bnei-Baruch/filer-backend/transcode"
 	"github.com/labstack/echo"
 	uuid "github.com/satori/go.uuid"
-	"kbb1.com/fileindex"
-	"kbb1.com/fileutils"
-	"kbb1.com/transcode"
 )
 
 type (
@@ -119,10 +119,7 @@ func postTranscode(c echo.Context) (err error) {
 			return c.String(http.StatusBadRequest, "No preset")
 		}
 
-		uu, err := uuid.NewV4()
-		if err != nil {
-			return c.String(http.StatusBadRequest, err.Error())
-		}
+		uu := uuid.NewV4()
 
 		task.Target = fileutils.AddSlash(srvCtx.Config.TransWork) + uu.String() + ".mp4"
 		task.Ctx = r

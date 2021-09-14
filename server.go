@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"kbb1.com/fileindex"
-	"kbb1.com/fileutils"
-	"kbb1.com/transcode"
+	"github.com/Bnei-Baruch/filer-backend/fileindex"
+	"github.com/Bnei-Baruch/filer-backend/fileutils"
+	"github.com/Bnei-Baruch/filer-backend/transcode"
 
 	"github.com/labstack/echo"
 )
