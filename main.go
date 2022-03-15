@@ -85,7 +85,7 @@ func configLoad() *toml.Tree {
 	home := os.Getenv("HOME")
 	config, err := toml.LoadFile(home + "/" + localConf)
 	if err != nil {
-		if err == os.ErrNotExist {
+		if os.IsNotExist(err) {
 			config, err = toml.LoadFile(globalConf)
 		}
 		if err != nil {
