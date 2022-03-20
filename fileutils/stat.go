@@ -12,7 +12,7 @@ func DiskAvailable(path string) int64 {
 	if err != nil {
 		return -1
 	} else {
-		return statfs.Bsize * int64(statfs.Bavail)
+		return int64(uint64(statfs.Bsize) * statfs.Bavail)
 	}
 }
 
