@@ -17,7 +17,7 @@ import (
 	"github.com/Bnei-Baruch/filer-backend/fileutils"
 	"github.com/Bnei-Baruch/filer-backend/transcode"
 
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
 var (
