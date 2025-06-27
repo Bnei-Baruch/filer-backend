@@ -114,7 +114,7 @@ func stoponupdate(ch chan os.Signal) {
 		time.Sleep(time.Second * 2)
 		if s, err := os.Stat(prog); err == nil {
 			// skip if it's being updated now
-			if time.Now().Sub(s.ModTime()) < time.Second*2 {
+			if time.Since(s.ModTime()) < time.Second*2 {
 				continue
 			}
 			if s.ModTime() != stat.ModTime() {

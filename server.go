@@ -178,12 +178,14 @@ func updateServer(ctx UpdateCtx) {
 				mtime := stat.ModTime().Unix()
 				size := stat.Size()
 
+				// Check file exists in index and it has been modified
 				fs := getfs()
 				fr, ok := fs.SearchPath(pathtr)
 				if ok && fr.Size == size && fr.Mtime == mtime {
 					continue
 				}
 
+				// Check if the file must be omited from indexing
 				fr = &fileindex.FileRec{
 					Path:  pathtr,
 					Size:  size,
@@ -199,11 +201,13 @@ func updateServer(ctx UpdateCtx) {
 					continue
 				}
 
-				if stat2.Size() != stat.Size() && stat2.ModTime() != stat2.ModTime() {
+				// Verify that the file has not been modified during a checksum creation
+				if stat2.Size() != stat.Size() || stat2.ModTime() != stat.ModTime() {
 					log.Println("Update (being modified):", pathtr)
 					continue
 				}
 
+				// Add a record to index (non persistent)
 				fr.Sha1 = hex.EncodeToString(sha1)
 				log.Println("SHA1:", fr.Sha1)
 
