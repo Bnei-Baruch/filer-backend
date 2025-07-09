@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine3.15 as build
+FROM golang:1.20 AS build
 
 LABEL maintainer="edoshor@gmail.com"
 
@@ -6,7 +6,7 @@ WORKDIR /build
 COPY . .
 RUN go build
 
-FROM alpine:3.15
+FROM alpine
 
 WORKDIR /app
 COPY ./filer_storage.conf /etc/
