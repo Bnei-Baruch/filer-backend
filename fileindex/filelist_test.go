@@ -21,7 +21,7 @@ func TestLoad(t *testing.T) {
 		f := bufio.NewReader(strings.NewReader(files))
 		l, err := Load(f, nil)
 		if err != nil {
-			t.Errorf("Error: ", err)
+			t.Errorf("Error: %v", err)
 		} else if len(l) != expect {
 			t.Errorf("Load records = %d, expected %d", len(l), expect)
 		}
